@@ -1,8 +1,19 @@
- {
+{
   "redirects": [
     {
       "source": "/",
-      "destination": "https://github.com/novatorem/novatorem"
+      "destination": "https://bhavik-spotify-now-playing.vercel.app/api/spotify"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/spotify",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "max-age=60, s-maxage=60, stale-while-revalidate"
+        }
+      ]
     }
   ]
 }
