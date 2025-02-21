@@ -109,6 +109,13 @@
                 bars.forEach(bar => {
                     bar.style.backgroundImage = barGradient;
                 });
+
+                //href updates
+                document.getElementById('album-art-link').href = data.song_uri 
+                document.getElementById('songtitle-link').href = data.song_uri 
+                document.getElementById('songartist-link').href = data.artist_uri 
+                document.getElementById('spotifylogo-link').href = data.song_uri 
+                document.getElementById('album-art-link').href = data.song_uri 
             } catch (error) {
                 console.error('Error fetching dynamic content:', error);
             }
