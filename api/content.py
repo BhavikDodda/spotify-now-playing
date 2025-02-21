@@ -186,21 +186,69 @@ def makeSVG(data, background_color, border_color):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 @app.route('/with_parameters')
-def catch_all(path):
+def get_content(path):
     background_color = request.args.get('background_color') or "181414"
     border_color = request.args.get('border_color') or "181414"
 
     try:
+        # Fetch currently playing song
         data = get(NOW_PLAYING_URL)
     except Exception:
+        # Fallback to recently played songs if no song is playing
         data = get(RECENTLY_PLAYING_URL)
 
-    svg = makeSVG(data, background_color, border_color)
+    # Extract song details
+    if "is_playing" in data:
+        item = data["item"]
+        progress_ms = data.get("progress_ms", 0)
+        duration_ms = item["duration_ms"]
+        progress_percentage = (progress_ms / duration_ms) * 100 if duration_ms > 0 else 0
+        current_status = "Vibing to:"
+    else:
+        # Handle recently played songs
+        recent_plays = data["items"]
+        if not recent_plays:
+            return jsonify({"error": "No song data available"}), 404
 
-    resp = Response(svg, mimetype="image/svg+xml")
-    resp.headers["Cache-Control"] = "s-maxage=1"
+        item = random.choice(recent_plays)["track"]
+        progress_ms = 0
+        duration_ms = item["duration_ms"]
+        progress_percentage = 0
+        current_status = "Recently played:"
 
-    return resp
+    # Album art and color palette
+    if item["album"]["images"]:
+        image_url = item["album"]["images"][1]["url"]
+        image_b64 = loadImageB64(image_url)
+        bar_palette = gradientGen(image_url, 4)
+        song_palette = gradientGen(image_url, 2)
+    else:
+        image_b64 = PLACEHOLDER_IMAGE
+        bar_palette = gradientGen(PLACEHOLDER_URL, 4)
+        song_palette = gradientGen(PLACEHOLDER_URL, 2)
+
+    # Format time
+    progress = format_time(progress_ms)
+    duration = format_time(duration_ms)
+
+    # Prepare JSON response
+    response_data = {
+        "status": current_status,
+        "song_name": item["name"].replace(" &", " &"),
+        "artist_name": item["artists"][0]["name"].replace(" &", " &"),
+        "song_uri": item["external_urls"]["spotify"],
+        "artist_uri": item["artists"][0]["external_urls"]["spotify"],
+        "image": image_b64,
+        "progress": progress,
+        "duration": duration,
+        "progress_percentage": progress_percentage,
+        "background_color": background_color,
+        "border_color": border_color,
+        "bar_palette": bar_palette,
+        "song_palette": song_palette,
+    }
+
+    return jsonify(response_data)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True, port=os.getenv("PORT") or 5000)
