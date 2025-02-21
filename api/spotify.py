@@ -7,7 +7,7 @@ import requests
 from colorthief import ColorThief
 from base64 import b64encode
 from dotenv import load_dotenv, find_dotenv
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, render_template, request, jsonify
 
 load_dotenv(find_dotenv())
 
@@ -114,6 +114,12 @@ def loadImageB64(url):
     response = requests.get(url)
     return b64encode(response.content).decode("ascii")
 
+def format_time(milliseconds):
+    """Convert milliseconds to MM:SS format."""
+    seconds = int(milliseconds / 1000)
+    minutes = seconds // 60
+    seconds %= 60
+    return f"{minutes:02}:{seconds:02}"
 
 def makeSVG(data, background_color, border_color):
     barCount = 84
@@ -121,15 +127,22 @@ def makeSVG(data, background_color, border_color):
     barCSS = barGen(barCount)
 
     if not "is_playing" in data:
-        contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
+        contentBar = ""  # Shows/Hides the EQ bar if no song is currently playing
         currentStatus = "Recently played:"
         recentPlays = get(RECENTLY_PLAYING_URL)
         recentPlaysLength = len(recentPlays["items"])
         itemIndex = random.randint(0, recentPlaysLength - 1)
         item = recentPlays["items"][itemIndex]["track"]
+        progress_ms = 0
+        duration_ms = item["duration_ms"]
     else:
         item = data["item"]
         currentStatus = "Vibing to:"
+        progress_ms = data.get("progress_ms", 0)
+        duration_ms = item["duration_ms"]
+
+    # Calculate progress percentage
+    progress_percentage = (progress_ms / duration_ms) * 100 if duration_ms > 0 else 0
 
     if item["album"]["images"] == []:
         image = PLACEHOLDER_IMAGE
@@ -140,10 +153,14 @@ def makeSVG(data, background_color, border_color):
         barPalette = gradientGen(item["album"]["images"][1]["url"], 4)
         songPalette = gradientGen(item["album"]["images"][1]["url"], 2)
 
-    artistName = item["artists"][0]["name"].replace("&", "&amp;")
-    songName = item["name"].replace("&", "&amp;")
+    artistName = item["artists"][0]["name"].replace(" &", " &")
+    songName = item["name"].replace(" &", " &")
     songURI = item["external_urls"]["spotify"]
     artistURI = item["artists"][0]["external_urls"]["spotify"]
+
+    # Format time
+    progress = format_time(progress_ms)
+    duration = format_time(duration_ms)
 
     dataDict = {
         "contentBar": contentBar,
@@ -157,7 +174,10 @@ def makeSVG(data, background_color, border_color):
         "background_color": background_color,
         "border_color": border_color,
         "barPalette": barPalette,
-        "songPalette": songPalette
+        "songPalette": songPalette,
+        "progress": progress,
+        "duration": duration,
+        "progress_percentage": progress_percentage,
     }
 
     return render_template(getTemplate(), **dataDict)
@@ -181,7 +201,74 @@ def catch_all(path):
     resp.headers["Cache-Control"] = "s-maxage=1"
 
     return resp
+@app.route("/current")
+def current():
+    return render_template("current.html")
 
+@app.route("/api/content")
+def get_content():
+    background_color = request.args.get('background_color') or "181414"
+    border_color = request.args.get('border_color') or "181414"
+
+    try:
+        # Fetch currently playing song
+        data = get(NOW_PLAYING_URL)
+    except Exception:
+        # Fallback to recently played songs if no song is playing
+        data = get(RECENTLY_PLAYING_URL)
+
+    # Extract song details
+    if "is_playing" in data:
+        item = data["item"]
+        progress_ms = data.get("progress_ms", 0)
+        duration_ms = item["duration_ms"]
+        progress_percentage = (progress_ms / duration_ms) * 100 if duration_ms > 0 else 0
+        current_status = "Vibing to:"
+    else:
+        # Handle recently played songs
+        recent_plays = data["items"]
+        if not recent_plays:
+            return jsonify({"error": "No song data available"}), 404
+
+        item = random.choice(recent_plays)["track"]
+        progress_ms = 0
+        duration_ms = item["duration_ms"]
+        progress_percentage = 0
+        current_status = "Recently played:"
+
+    # Album art and color palette
+    if item["album"]["images"]:
+        image_url = item["album"]["images"][1]["url"]
+        image_b64 = loadImageB64(image_url)
+        bar_palette = gradientGen(image_url, 4)
+        song_palette = gradientGen(image_url, 2)
+    else:
+        image_b64 = PLACEHOLDER_IMAGE
+        bar_palette = gradientGen(PLACEHOLDER_URL, 4)
+        song_palette = gradientGen(PLACEHOLDER_URL, 2)
+
+    # Format time
+    progress = format_time(progress_ms)
+    duration = format_time(duration_ms)
+
+    # Prepare JSON response
+    response_data = {
+        "status": current_status,
+        "song_name": item["name"].replace(" &", " &"),
+        "artist_name": item["artists"][0]["name"].replace(" &", " &"),
+        "song_uri": item["external_urls"]["spotify"],
+        "artist_uri": item["artists"][0]["external_urls"]["spotify"],
+        "image": image_b64,
+        "progress": progress,
+        "duration": duration,
+        "progress_percentage": progress_percentage,
+        "background_color": background_color,
+        "border_color": border_color,
+        "bar_palette": bar_palette,
+        "song_palette": song_palette,
+    }
+
+    return jsonify(response_data)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True, port=os.getenv("PORT") or 5000)

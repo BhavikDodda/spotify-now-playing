@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Now Playing</title>
+    <style>
+        #loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        #loading svg {
+            width: 50px;
+            height: 50px;
+        }
+        .status-text {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 18px; /* Match the font size of the SVG */
+            font-family: 'Arial', sans-serif; /* Use the same font family as the SVG */
+            font-weight: bold; /* Make it bold for emphasis */
+            color: #ffffff; /* Default white color */
+            background: linear-gradient(
+                125deg, 
+                rgb(100, 100, 255), /* Example gradient colors */
+                rgb(200, 50, 255)
+            );
+            background-size: 200% 100%;
+            background-position: 0% 50%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 10s ease infinite; /* Add a gradient animation */
+        }
+
+        @keyframes gradient {
+            0% {
+                background-position: 0% 50%;
+            }
+            100% {
+                background-position: 100% 50%;
+            }
+        }
+       
+    </style>
+</head>
+<body>
+    <!-- Loading Indicator -->
+    <div id="loading">
+        <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="25" cy="25" r="20" fill="none" stroke="#ccc" stroke-width="5" stroke-dasharray="31.415, 31.415" transform="rotate(-90 25 25)">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite" />
+            </circle>
+        </svg>
+    </div>
+
+    <!-- Status Text -->
+    <div id="status-text" class="status-text" style="text-align: left; margin-top: 10px; font-size: 16px;">
+        Loading...
+    </div>
+
+    <!-- SVG Container -->
+    <div id="spotify-container">
+    </div>
+
+    <script>
+        // Function to fetch and load the initial SVG
+        async function loadInitialSVG() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+
+                const response = await fetch('/api/spotify');
+                const svgData = await response.text();
+
+                document.getElementById('spotify-container').innerHTML = svgData;
+
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                console.error('Error loading initial SVG:', error);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        async function updateDynamicContent() {
+            try {
+                const response = await fetch('/api/content');
+                const data = await response.json();
+
+                document.getElementById('artist-name').textContent = data.artist_name;
+                document.getElementById('song-name').textContent = data.song_name;
+                document.getElementById('album-art').src = "data:image/png;base64,"+data.image;
+                document.querySelector('.progress-bar').style.width = `${data.progress_percentage}%`;
+                document.getElementById('progress').textContent = data.progress;
+                document.getElementById('duration').textContent = data.duration;
+                document.getElementById('status-text').textContent = data.status;
+
+                // Update the background colors for .song and .artist
+                const songGradient = `linear-gradient(125deg, rgb(${data.song_palette[0][0]}, ${data.song_palette[0][1]}, ${data.song_palette[0][2]}), rgb(${data.song_palette[1][0]}, ${data.song_palette[1][1]}, ${data.song_palette[1][2]}))`;
+                const artistGradient = `linear-gradient(-125deg, rgb(${data.song_palette[0][0]}, ${data.song_palette[0][1]}, ${data.song_palette[0][2]}), rgb(${data.song_palette[1][0]}, ${data.song_palette[1][1]}, ${data.song_palette[1][2]}))`;
+
+                document.querySelector('.song').style.backgroundImage = songGradient;
+                document.querySelector('.artist').style.backgroundImage = artistGradient;
+
+                document.querySelector('.progress-bar').style.backgroundColor = `rgb(${data.song_palette[0][0]}, ${data.song_palette[0][1]}, ${data.song_palette[0][2]})`;
+
+                const bars = document.querySelectorAll('.bar');
+                const barGradient = `linear-gradient(90deg, rgb(${data.bar_palette[0][0]}, ${data.bar_palette[0][1]}, ${data.bar_palette[0][2]}) 0%, rgb(${data.bar_palette[1][0]}, ${data.bar_palette[1][1]}, ${data.bar_palette[1][2]}) 33%, rgb(${data.bar_palette[2][0]}, ${data.bar_palette[2][1]}, ${data.bar_palette[2][2]}) 66%, rgb(${data.bar_palette[3][0]}, ${data.bar_palette[3][1]}, ${data.bar_palette[3][2]}) 100%)`;
+
+                bars.forEach(bar => {
+                    bar.style.backgroundImage = barGradient;
+                });
+            } catch (error) {
+                console.error('Error fetching dynamic content:', error);
+            }
+        }
+
+        loadInitialSVG();
+
+        setInterval(updateDynamicContent, 1000);
+
+    </script>
+</body>
+</html>
