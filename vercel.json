@@ -1,8 +1,20 @@
 {
-  "redirects": [
+  "routes": [
     {
-      "source": "/",
-      "destination": "https://bhavik-spotify-now-playing.vercel.app/api/spotify"
+      "src": "/api/content",
+      "dest": "/api/content"
+    },
+    {
+      "src": "/api/spotify",
+      "dest": "/api/spotify"
+    },
+    {
+      "src": "/",
+      "dest": "/"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/"
     }
   ],
   "headers": [
@@ -12,6 +24,24 @@
         {
           "key": "Cache-Control",
           "value": "max-age=60, s-maxage=60, stale-while-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/api/content",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "max-age=60, s-maxage=60, stale-while-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
         }
       ]
     }

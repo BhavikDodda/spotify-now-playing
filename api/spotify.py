@@ -183,8 +183,8 @@ def makeSVG(data, background_color, border_color):
     return render_template(getTemplate(), **dataDict)
 
 
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
+#@app.route("/", defaults={"path": ""})
+#@app.route("/<path:path>")
 @app.route('/with_parameters')
 def catch_all(path):
     background_color = request.args.get('background_color') or "181414"
@@ -201,7 +201,7 @@ def catch_all(path):
     resp.headers["Cache-Control"] = "s-maxage=1"
 
     return resp
-@app.route("/current")
+@app.route("/")
 def current():
     return render_template("current.html")
 
